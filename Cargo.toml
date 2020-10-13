@@ -1,0 +1,17 @@
+[package]
+name = "esphomeapi"
+version = "0.1.0"
+authors = ["Vlad Pănăzan <vlad@panazan.ro>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+bytes = "0.5.6"
+pb-jelly = "0.0.3"
+# pb-jelly = {path= "/mnt/unFSmodern/CLONES/pb-jelly/pb-jelly"}
+proto_esphome = { path = "gen/proto_esphome" }
+integer-encoding = "2.0.0"
+downcast-rs = "1.2.0"
+thiserror = "1.0.21"
