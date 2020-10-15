@@ -4,6 +4,8 @@ use proto_esphome::api;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
+use message::EspMessage;
+
 pub struct ApiConnection {
     password: String,
     authenticated: bool,
@@ -25,31 +27,31 @@ impl ApiConnection {
             client_info: client_info.to_string(),
         };
 
-        let resp = new.write_message_read_response(hello)?;
+        let resp = new.write_message_read_response(hello.into())?;
 
-        if !resp.as_any().is::<api::HelloResponse>() {
+        if let EspMessage::HelloResponse(_) = resp {
+            Ok(new)
+        } else {
             panic!();
         }
-        Ok(new)
     }
     pub fn login(&mut self) {
         let connect = api::ConnectRequest {
             password: self.password.clone(),
         };
-        self.write_message_read_response(connect).unwrap();
+        self.write_message_read_response(connect.into()).unwrap();
         self.authenticated = true;
     }
 
     pub fn write_message(
         &mut self,
-        message: impl message::EspTrait,
-    ) -> Result<(), Box<dyn std::error::Error>>
- {
+        message: message::EspMessage,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let raw_msg = message.to_vec();
 
         // let h_str = hello.serialize();
         let leng = raw_msg.len().encode_var_vec();
-        let msg_type = message.get_no().encode_var_vec();
+        let msg_type = u32::from(message).encode_var_vec();
 
         println!("Length {:X?}", leng);
         println!("Bytes 0x{:X?}", raw_msg);
@@ -60,10 +62,7 @@ impl ApiConnection {
         Ok(())
     }
 
-    pub fn read_response(
-       &mut self,
-    ) -> Result<Box<dyn message::EspTrait>, Box<dyn std::error::Error>>
-    {
+    pub fn read_response(&mut self) -> Result<message::EspMessage, Box<dyn std::error::Error>> {
         let stream = &mut self.tcp;
         let preamble = read_n(stream, 1);
 
@@ -77,7 +76,8 @@ impl ApiConnection {
         // println!("type {:X?}", msg_type);
 
         let msg_raw = read_n(stream, length as u64);
-        let msg = message::from_vec(msg_type, msg_raw);
+        use std::convert::TryFrom;
+        let msg = message::EspMessage::try_from((msg_type, msg_raw));
         println!("message {:#?}", msg);
 
         Ok(msg?)
@@ -85,8 +85,8 @@ impl ApiConnection {
 
     pub fn write_message_read_response(
         &mut self,
-        message: impl message::EspTrait,
-    ) -> Result<Box<dyn message::EspTrait>, Box<dyn std::error::Error>> {
+        message: message::EspMessage,
+    ) -> Result<message::EspMessage, Box<dyn std::error::Error>> {
         // stream.write(message.as_slice())?;
         self.write_message(message)?;
 

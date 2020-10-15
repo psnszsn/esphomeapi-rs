@@ -2,6 +2,7 @@ use super::connection::ApiConnection;
 use super::message;
 use proto_esphome::api;
 use thiserror::Error;
+use message::EspMessage;
 
 pub struct ApiClient<A: std::net::ToSocketAddrs> {
     addr: A,
@@ -37,30 +38,29 @@ impl<A: std::net::ToSocketAddrs> ApiClient<A> {
             .connection
             .as_mut()
             .ok_or(ClientError::Unknown)?
-            .write_message_read_response(req)
+            .write_message_read_response(req.into())
             .map_err(|_| ClientError::Unknown)?;
 
-        if resp.as_any().is::<api::DeviceInfoResponse>() {
-            // panic!();
-            let r = resp.downcast::<api::DeviceInfoResponse>().unwrap();
-            Ok(*r)
-        } else {
+        if let EspMessage::DeviceInfoResponse(x) = resp {
+            Ok(x)
+        }else{
+
             Err(ClientError::Unknown)
         }
     }
 
     pub fn list_entities_services(
         &mut self,
-    ) -> Result<Vec<Box<dyn message::EspTrait>>, ClientError> {
+    ) -> Result<Vec<EspMessage>, ClientError> {
         let req = api::ListEntitiesRequest {};
         let connection = self.connection.as_mut().ok_or(ClientError::Unknown)?;
 
-        connection.write_message(req);
-        let mut v: Vec<Box<dyn message::EspTrait>> = Vec::new();
+        connection.write_message(req.into());
+        let mut v: Vec<EspMessage> = Vec::new();
 
         loop {
             let resp = connection.read_response().unwrap();
-            if resp.as_any().is::<api::ListEntitiesDoneResponse>() {
+            if let EspMessage::ListEntitiesDoneResponse(x) = resp {
                 break;
             } else {
                 v.push(resp);
@@ -109,7 +109,7 @@ impl<A: std::net::ToSocketAddrs> ApiClient<A> {
             ..api::LightCommandRequest::default()
         };
         let connection = self.connection.as_mut().ok_or(ClientError::Unknown)?;
-        connection.write_message(req)?;
+        connection.write_message(req.into())?;
         Ok(())
     }
 }
